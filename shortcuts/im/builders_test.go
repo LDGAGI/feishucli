@@ -504,6 +504,84 @@ func TestShortcutValidateBranches(t *testing.T) {
 		}
 	})
 
+	t.Run("validateIdempotencyKey empty string passes", func(t *testing.T) {
+		if err := validateIdempotencyKey(""); err != nil {
+			t.Fatalf("validateIdempotencyKey() unexpected error = %v", err)
+		}
+	})
+
+	t.Run("validateIdempotencyKey 50 chars passes", func(t *testing.T) {
+		if err := validateIdempotencyKey(strings.Repeat("a", 50)); err != nil {
+			t.Fatalf("validateIdempotencyKey() unexpected error = %v", err)
+		}
+	})
+
+	t.Run("validateIdempotencyKey 51 chars fails", func(t *testing.T) {
+		err := validateIdempotencyKey(strings.Repeat("a", 51))
+		if err == nil || !strings.Contains(err.Error(), "--idempotency-key exceeds the maximum of 50 characters") {
+			t.Fatalf("validateIdempotencyKey() error = %v", err)
+		}
+	})
+
+	t.Run("validateIdempotencyKey 50 Chinese chars passes", func(t *testing.T) {
+		if err := validateIdempotencyKey(strings.Repeat("中", 50)); err != nil {
+			t.Fatalf("validateIdempotencyKey() unexpected error = %v", err)
+		}
+	})
+
+	t.Run("validateIdempotencyKey 51 Chinese chars fails", func(t *testing.T) {
+		err := validateIdempotencyKey(strings.Repeat("中", 51))
+		if err == nil || !strings.Contains(err.Error(), "--idempotency-key exceeds the maximum of 50 characters") {
+			t.Fatalf("validateIdempotencyKey() error = %v", err)
+		}
+	})
+
+	t.Run("ImMessagesSend idempotency key too long", func(t *testing.T) {
+		runtime := newTestRuntimeContext(t, map[string]string{
+			"chat-id":         "oc_123",
+			"text":            "hello",
+			"idempotency-key": strings.Repeat("a", 51),
+		}, nil)
+		err := ImMessagesSend.Validate(context.Background(), runtime)
+		if err == nil || !strings.Contains(err.Error(), "--idempotency-key exceeds the maximum of 50 characters") {
+			t.Fatalf("ImMessagesSend.Validate() error = %v", err)
+		}
+	})
+
+	t.Run("ImMessagesSend idempotency key valid", func(t *testing.T) {
+		runtime := newTestRuntimeContext(t, map[string]string{
+			"chat-id":         "oc_123",
+			"text":            "hello",
+			"idempotency-key": "my-key-001",
+		}, nil)
+		if err := ImMessagesSend.Validate(context.Background(), runtime); err != nil {
+			t.Fatalf("ImMessagesSend.Validate() unexpected error = %v", err)
+		}
+	})
+
+	t.Run("ImMessagesReply idempotency key too long", func(t *testing.T) {
+		runtime := newTestRuntimeContext(t, map[string]string{
+			"message-id":      "om_123",
+			"text":            "hello",
+			"idempotency-key": strings.Repeat("b", 51),
+		}, nil)
+		err := ImMessagesReply.Validate(context.Background(), runtime)
+		if err == nil || !strings.Contains(err.Error(), "--idempotency-key exceeds the maximum of 50 characters") {
+			t.Fatalf("ImMessagesReply.Validate() error = %v", err)
+		}
+	})
+
+	t.Run("ImMessagesReply idempotency key valid", func(t *testing.T) {
+		runtime := newTestRuntimeContext(t, map[string]string{
+			"message-id":      "om_123",
+			"text":            "hello",
+			"idempotency-key": "reply-key-001",
+		}, nil)
+		if err := ImMessagesReply.Validate(context.Background(), runtime); err != nil {
+			t.Fatalf("ImMessagesReply.Validate() unexpected error = %v", err)
+		}
+	})
+
 	t.Run("ImMessagesReply invalid message id", func(t *testing.T) {
 		runtime := newTestRuntimeContext(t, map[string]string{
 			"message-id": "bad_id",
